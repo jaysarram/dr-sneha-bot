@@ -17,11 +17,11 @@ GEMINI_API_KEY = "AIzaSyBU-lFuYeHKf5ETLwcV8hmO1OakGiQLoKo"
 QR_IMAGE_PATH = "payment_qr.jpg" 
 
 # Gemini AI Setup
-genai.configure(api_key=GEMINI_API_KEY)
+genai.configure(api_key=AIzaSyBU-lFuYeHKf5ETLwcV8hmO1OakGiQLoKo
+)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
-bot = telebot.TeleBot(BOT_TOKEN)
-
+bot = telebot.TeleBot(8514223652:AAHT9BEMDVJPQvepz-ftcU-m8mnFUIVDPAY)
 # ================= DATABASE (SIMULATED) =================
 # असली ऐप में इसके लिए Database (SQL/MongoDB) यूज़ करें।
 # यहाँ हम temporary dictionary यूज़ कर रहे हैं।
@@ -230,4 +230,5 @@ t.start()
 
 # ================= START BOT =================
 print("Dr. Sneha Bot is Running...")
+
 bot.infinity_polling()

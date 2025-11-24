@@ -1,3 +1,4 @@
+import os
 from flask import Flask
 import telebot
 from telebot import types
@@ -30,8 +31,25 @@ def home():
 
 def run_web_server():
     # Render से सही PORT नंबर लेना ज़रूरी है
-    port = int(os.environ.get("PORT", 4000))
-    app.run(host='0.0.0.0', port=port)
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=4000)
+    def keep_alive():
+        t=
+        threading.thread(target=run_web_server)
+        t.daemon = true
+        t.start()
+# ================= MAIN EXECUTION =================
+if __name__ == "__main__":
+    # 1. Sabse pehle Fake Server start karein
+    keep_alive()
+    
+    # 2. Agar scheduler hai to use bhi start karein (Optional)
+    # threading.Thread(target=run_scheduler, daemon=True).start()
+
+    # 3. Last me Bot start karein
+    print("Bot is running...")
+    bot.infinity_polling()
+
 # ================= DATABASE (SIMULATED) =================
 # असली ऐप में इसके लिए Database (SQL/MongoDB) यूज़ करें।
 # यहाँ हम temporary dictionary यूज़ कर रहे हैं।
@@ -242,6 +260,7 @@ t.start()
 print("Dr. Sneha Bot is Running...")
 
 bot.infinity_polling()
+
 
 
 

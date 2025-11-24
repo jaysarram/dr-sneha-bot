@@ -30,7 +30,7 @@ def home():
 
 def run_web_server():
     # Render से सही PORT नंबर लेना ज़रूरी है
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 4000))
     app.run(host='0.0.0.0', port=port)
 # ================= DATABASE (SIMULATED) =================
 # असली ऐप में इसके लिए Database (SQL/MongoDB) यूज़ करें।
@@ -242,6 +242,7 @@ t.start()
 print("Dr. Sneha Bot is Running...")
 
 bot.infinity_polling()
+
 
 
 

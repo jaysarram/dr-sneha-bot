@@ -17,11 +17,19 @@ GEMINI_API_KEY = "AIzaSyBU-lFuYeHKf5ETLwcV8hmO1OakGiQLoKo"
 QR_IMAGE_PATH = "payment_qr.jpg" 
 
 # Gemini AI Setup
-genai.configure(api_key=AIzaSyBU-lFuYeHKf5ETLwcV8hmO1OakGiQLoKo
-)
+genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
+bot = telebot.TeleBot(BOT_TOKEN)
+# ================= WEB SERVER (TO KEEP BOT ALIVE) =================
+app = Flask(__name__)
 
-bot = telebot.TeleBot(8514223652:AAHT9BEMDVJPQvepz-ftcU-m8mnFUIVDPAY)
+@app.route('/')
+def home():
+    return "Dr. Sneha Bot is Alive and Running!"
+
+def run_web_server():
+    # Render requires the app to listen on port 0.0.0.0
+    app.run(host='0.0.0.0', port=8080)
 # ================= DATABASE (SIMULATED) =================
 # असली ऐप में इसके लिए Database (SQL/MongoDB) यूज़ करें।
 # यहाँ हम temporary dictionary यूज़ कर रहे हैं।
@@ -232,3 +240,4 @@ t.start()
 print("Dr. Sneha Bot is Running...")
 
 bot.infinity_polling()
+

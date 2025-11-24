@@ -29,8 +29,9 @@ def home():
     return "Dr. Sneha Bot is Alive and Running!"
 
 def run_web_server():
-    # Render requires the app to listen on port 0.0.0.0
-    app.run(host='0.0.0.0', port=8080)
+    # Render से सही PORT नंबर लेना ज़रूरी है
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
 # ================= DATABASE (SIMULATED) =================
 # असली ऐप में इसके लिए Database (SQL/MongoDB) यूज़ करें।
 # यहाँ हम temporary dictionary यूज़ कर रहे हैं।
@@ -241,5 +242,6 @@ t.start()
 print("Dr. Sneha Bot is Running...")
 
 bot.infinity_polling()
+
 
 

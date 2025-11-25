@@ -34,8 +34,7 @@ def run_web_server():
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=4000)
     def keep_alive():
-        t=
-        threading.thread(target=run_web_server)
+        t=threading.thread(target=run_web_server)
         t.daemon = true
         t.start()
 # ================= MAIN EXECUTION =================
@@ -260,6 +259,7 @@ t.start()
 print("Dr. Sneha Bot is Running...")
 
 bot.infinity_polling()
+
 
 
 

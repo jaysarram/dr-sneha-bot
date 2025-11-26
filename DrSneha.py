@@ -18,7 +18,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "8514223652:AAHT9BEMDVJPQvepz-ftcU-m8mnFUIVDP
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyBU-lFuYeHKf5ETLwcV8hmO1OakGiQLoKo")
 
 # Payment QR Code file name (Make sure this image exists in the folder)
-QR_IMAGE_PATH = "payment_qr.jpg"
+QR_IMAGE_PATH = "business_qr.jpg"
 
 # Gemini AI Setup (if you don't use Gemini, leave as-is; calls are wrapped in try/except)
 genai.configure(api_key=GEMINI_API_KEY)
@@ -271,3 +271,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

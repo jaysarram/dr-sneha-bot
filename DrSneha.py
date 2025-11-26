@@ -1,4 +1,16 @@
 # dr_sneha_bot.py  (Corrected & runnable prototype)
+def get_ai_response(user_message, image_part=None):
+    system_prompt = "You are Dr. Sneha, an expert AI medical consultant. Language: Hinglish. Answer strictly about the medical condition."
+    prompt_content = [system_prompt, user_message]
+    if image_part: prompt_content.append(image_part)
+
+    try:
+        response = model.generate_content(prompt_content)
+        return response.text
+    except Exception as e:
+        # एरर को प्रिंट करें ताकि Logs में दिखे
+        print(f"ERROR: {e}") 
+        return "Maafi chahti hu, main abhi process nahi kar pa rahi. (Technical Error)"
 import os
 import threading
 import time
@@ -271,4 +283,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 

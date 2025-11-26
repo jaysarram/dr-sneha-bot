@@ -39,7 +39,7 @@ try:
 except Exception:
     model = None  # safe fallback for environments without Gemini
 
-bot = telebot.TeleBot(8514223652:AAH-1qD3aU0PKgLtMmJatXxqZWwz5YQtjyY)
+bot = telebot.TeleBot(BOT_TOKEN)
 
 # ================= WEB SERVER (TO KEEP BOT ALIVE) =================
 app = Flask(__name__)
@@ -283,6 +283,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 

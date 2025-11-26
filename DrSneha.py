@@ -26,7 +26,7 @@ import requests
 
 # ================= CONFIGURATION =================
 # अपनी Keys यहाँ डालें (Production me .env use karein)
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8514223652:AAHT9BEMDVJPQvepz-ftcU-m8mnFUIVDPAY")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8514223652:AAH-1qD3aU0PKgLtMmJatXxqZWwz5YQtjyY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyBU-lFuYeHKf5ETLwcV8hmO1OakGiQLoKo")
 
 # Payment QR Code file name (Make sure this image exists in the folder)
@@ -283,5 +283,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 

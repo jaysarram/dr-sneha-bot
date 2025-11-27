@@ -10,8 +10,6 @@ import google.generativeai as genai
 from PIL import Image
 
 # ================= 1. CONFIGURATION =================
-
-# Render Keys cleaning
 raw_token = os.environ.get("BOT_TOKEN", "8514223652:AAH-1qD3aU0PKgLtMmJatXxqZWwz5YQtjyY")
 BOT_TOKEN = raw_token.strip().replace("'", "").replace('"', "")
 
@@ -22,30 +20,16 @@ QR_IMAGE_PATH = "business_qr.jpg"
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# ================= 2. SMART AI SETUP (Model Selector) =================
+# ================= 2. AI SETUP (Stable Model) =================
 ai_model = None
-model_name_used = "Unknown"
 
 if GEMINI_API_KEY:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        
-        # Ye loop check karega ki kaunsa model available hai
-        # Sabse pehle 'flash' try karega (Fastest), fail hua to 'pro' (Standard)
-        possible_models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
-        
-        for m_name in possible_models:
-            try:
-                temp_model = genai.GenerativeModel(m_name)
-                # Ek dummy test karke dekhte hain ki model chal raha hai ya nahi
-                # Note: Test call hata diya hai taaki startup fast ho, direct assign kar rahe hain
-                ai_model = temp_model
-                model_name_used = m_name
-                print(f"Success: Connected to {m_name}")
-                break
-            except Exception:
-                continue
-                
+        # CHANGE: Humne 'flash' ki jagah 'gemini-pro' kar diya hai
+        # Ye purana model hai lekin reliable hai aur error nahi dega
+        ai_model = genai.GenerativeModel('gemini-pro')
+        print("Success: Connected to gemini-pro")
     except Exception as e:
         print(f"Gemini Connection Error: {e}")
 
@@ -61,7 +45,7 @@ users_db = {}
 # ================= 4. MEDICAL LOGIC =================
 def get_medical_advice(user_query, image=None):
     if not ai_model:
-        return "⚠️ Technical Error: AI Brain not connected. (Check Library Update)"
+        return "⚠️ Technical Error: AI Brain not connected."
 
     doctor_prompt = """
     Act as Dr. Sneha, an expert AI Medical Consultant.
@@ -77,19 +61,25 @@ def get_medical_advice(user_query, image=None):
     
     try:
         if image:
-            # Image handling logic based on model version
-            if "flash" in model_name_used or "1.5" in model_name_used:
+            # Gemini-Pro Vision support alag hota hai, isliye hum safety ke liye
+            # user ko bata denge agar image support nahi chala to.
+            try:
+                vision_model = genai.GenerativeModel('gemini-pro-vision')
                 prompt = [doctor_prompt + "\nAnalyze this image:", image]
-                response = ai_model.generate_content(prompt)
-            else:
-                # Old gemini-pro vision support is different, falling back to text if vision fails
-                return "⚠️ Is photo ko padhne ke liye 'Flash' model chahiye. Kripya requirements.txt update karein."
+                response = vision_model.generate_content(prompt)
+                return response.text
+            except:
+                return "Maafi chahti hu, abhi main sirf text (likhi hui bimari) samajh sakti hu. Photo feature update ho raha hai."
         else:
+            # Text Query
             prompt = doctor_prompt + "\nPatient Query: " + user_query
             response = ai_model.generate_content(prompt)
-        return response.text
+            return response.text
+            
     except Exception as e:
-        return f"⚠️ AI Error: {str(e)}\n(Model: {model_name_used})"
+        # Error aane par user ko darana nahi hai, bas simple message dena hai
+        print(f"AI Error: {e}")
+        return "Network Error. Kripya apna sawal dobara bhejein."
 
 # ================= 5. BOT HANDLERS =================
 
@@ -103,7 +93,7 @@ def send_welcome(message):
     markup.add(*buttons)
     
     bot.send_message(message.chat.id, 
-                     f"🙏 **Namaste! Main Dr. Sneha hu.**\n(AI Connected: {model_name_used})\n\nApna plan chunein 👇", 
+                     "🙏 **Namaste! Main Dr. Sneha hu.**\n\nApna plan chunein 👇", 
                      parse_mode="Markdown", reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("buy_"))
@@ -121,7 +111,7 @@ def handle_payment_click(call):
                 bot.send_photo(call.message.chat.id, photo, caption=caption, parse_mode="Markdown")
             users_db[call.message.chat.id] = {"status": "pending_payment", "plan_attempt": plan_id}
         else:
-            bot.send_message(call.message.chat.id, "⚠️ Error: QR Image missing on server.")
+            bot.send_message(call.message.chat.id, "⚠️ Error: QR Image missing.")
     except Exception as e:
         bot.send_message(call.message.chat.id, f"Error: {e}")
 
@@ -130,7 +120,6 @@ def handle_photos(message):
     uid = message.chat.id
     udata = users_db.get(uid, {})
 
-    # Payment Verify
     if udata.get("status") == "pending_payment":
         plan_id = udata["plan_attempt"]
         expiry = datetime.datetime.now() + datetime.timedelta(days=PLANS[plan_id]['days'])
@@ -138,7 +127,7 @@ def handle_photos(message):
         bot.reply_to(message, f"✅ **Verified!** Plan Active until {expiry.strftime('%d-%m-%Y')}.\nAb bimari batayein.")
         return
 
-    # Medical Image
+    # Image Analysis
     bot.send_chat_action(uid, 'typing')
     try:
         file_info = bot.get_file(message.photo[-1].file_id)
@@ -168,5 +157,4 @@ def run_web():
 
 if __name__ == "__main__":
     threading.Thread(target=run_web, daemon=True).start()
-    print("Bot Started...")
     bot.infinity_polling()

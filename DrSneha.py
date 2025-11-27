@@ -49,13 +49,13 @@ def get_medical_advice(user_query):
     """
     
     try:
-        # Groq Llama-3 Model Call
+        # Groq Llama-3.3 Model Call
         chat_completion = ai_client.chat.completions.create(
             messages=[
                 {"role": "system", "content": doctor_prompt},
                 {"role": "user", "content": user_query}
             ],
-            model="llama3-8b-8192", # Super Fast & Smart Model
+            model="llama-3.3-70b-versatile", # Super Fast & Smart Model
         )
         return chat_completion.choices[0].message.content
     except Exception as e:
@@ -140,4 +140,5 @@ def run_web():
 if __name__ == "__main__":
     threading.Thread(target=run_web, daemon=True).start()
     bot.infinity_polling()
+
 

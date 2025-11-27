@@ -6,46 +6,35 @@ import io
 from flask import Flask
 import telebot
 from telebot import types
-import google.generativeai as genai
+from groq import Groq  # <-- Google ki jagah Groq aa gaya
 from PIL import Image
 
 # ================= 1. CONFIGURATION =================
+# Telegram Token
 raw_token = os.environ.get("BOT_TOKEN", "8514223652:AAH-1qD3aU0PKgLtMmJatXxqZWwz5YQtjyY")
 BOT_TOKEN = raw_token.strip().replace("'", "").replace('"', "")
 
-raw_gemini = os.environ.get("GEMINI_API_KEY", "AIzaSyAlkLe-A78iY_wAWo-cA7H7f7PloGCC5gI")
-GEMINI_API_KEY = raw_gemini.strip().replace("'", "").replace('"', "")
+# Groq API Key
+raw_groq = os.environ.get("GROQ_API_KEY", "gsk_...FbzB")
+GROQ_API_KEY = raw_groq.strip().replace("'", "").replace('"', "")
 
 QR_IMAGE_PATH = "business_qr.jpg" 
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# ================= 2. AI SETUP (Stable Model) =================
-ai_model = None
-
-if GEMINI_API_KEY:
+# AI Client Setup
+ai_client = None
+if GROQ_API_KEY:
     try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        # CHANGE: Humne 'flash' ki jagah 'gemini-pro' kar diya hai
-        # Ye purana model hai lekin reliable hai aur error nahi dega
-        ai_model = genai.GenerativeModel('gemini-pro')
-        print("Success: Connected to gemini-pro")
+        ai_client = Groq(api_key=GROQ_API_KEY)
+        print("Success: Connected to Groq AI")
     except Exception as e:
-        print(f"Gemini Connection Error: {e}")
+        print(f"Groq Connection Error: {e}")
 
-# ================= 3. PLANS =================
-PLANS = {
-    "49":  {"price": 49,  "days": 1,  "name": "Quick Consult"}, 
-    "149": {"price": 149, "days": 15, "name": "15 Days Care"},
-    "299": {"price": 299, "days": 30, "name": "Monthly Health"},
-    "599": {"price": 599, "days": 90, "name": "Premium Care"}
-}
-users_db = {}
-
-# ================= 4. MEDICAL LOGIC =================
-def get_medical_advice(user_query, image=None):
-    if not ai_model:
-        return "⚠️ Technical Error: AI Brain not connected."
+# ================= 2. MEDICAL LOGIC (Llama 3 via Groq) =================
+def get_medical_advice(user_query):
+    if not ai_client:
+        return "⚠️ Technical Error: AI Brain (Groq) not connected."
 
     doctor_prompt = """
     Act as Dr. Sneha, an expert AI Medical Consultant.
@@ -60,28 +49,26 @@ def get_medical_advice(user_query, image=None):
     """
     
     try:
-        if image:
-            # Gemini-Pro Vision support alag hota hai, isliye hum safety ke liye
-            # user ko bata denge agar image support nahi chala to.
-            try:
-                vision_model = genai.GenerativeModel('gemini-pro-vision')
-                prompt = [doctor_prompt + "\nAnalyze this image:", image]
-                response = vision_model.generate_content(prompt)
-                return response.text
-            except:
-                return "Maafi chahti hu, abhi main sirf text (likhi hui bimari) samajh sakti hu. Photo feature update ho raha hai."
-        else:
-            # Text Query
-            prompt = doctor_prompt + "\nPatient Query: " + user_query
-            response = ai_model.generate_content(prompt)
-            return response.text
-            
+        # Groq Llama-3 Model Call
+        chat_completion = ai_client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": doctor_prompt},
+                {"role": "user", "content": user_query}
+            ],
+            model="llama3-8b-8192", # Super Fast & Smart Model
+        )
+        return chat_completion.choices[0].message.content
     except Exception as e:
-        # Error aane par user ko darana nahi hai, bas simple message dena hai
-        print(f"AI Error: {e}")
-        return "Network Error. Kripya apna sawal dobara bhejein."
+        return f"⚠️ AI Error: {str(e)}"
 
-# ================= 5. BOT HANDLERS =================
+# ================= 3. PLANS & HANDLERS =================
+PLANS = {
+    "49":  {"price": 49,  "days": 1,  "name": "Quick Consult"}, 
+    "149": {"price": 149, "days": 15, "name": "15 Days Care"},
+    "299": {"price": 299, "days": 30, "name": "Monthly Health"},
+    "599": {"price": 599, "days": 90, "name": "Premium Care"}
+}
+users_db = {}
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -93,7 +80,7 @@ def send_welcome(message):
     markup.add(*buttons)
     
     bot.send_message(message.chat.id, 
-                     "🙏 **Namaste! Main Dr. Sneha hu.**\n\nApna plan chunein 👇", 
+                     "🙏 **Namaste! Main Dr. Sneha hu.**\n(Powered by Groq AI ⚡)\n\nApna plan chunein 👇", 
                      parse_mode="Markdown", reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("buy_"))
@@ -120,6 +107,7 @@ def handle_photos(message):
     uid = message.chat.id
     udata = users_db.get(uid, {})
 
+    # Payment Verification
     if udata.get("status") == "pending_payment":
         plan_id = udata["plan_attempt"]
         expiry = datetime.datetime.now() + datetime.timedelta(days=PLANS[plan_id]['days'])
@@ -127,30 +115,24 @@ def handle_photos(message):
         bot.reply_to(message, f"✅ **Verified!** Plan Active until {expiry.strftime('%d-%m-%Y')}.\nAb bimari batayein.")
         return
 
-    # Image Analysis
-    bot.send_chat_action(uid, 'typing')
-    try:
-        file_info = bot.get_file(message.photo[-1].file_id)
-        downloaded = bot.download_file(file_info.file_path)
-        img = Image.open(io.BytesIO(downloaded)).convert("RGB")
-        reply = get_medical_advice("", image=img)
-        bot.reply_to(message, reply, parse_mode="Markdown")
-    except Exception as e:
-        bot.reply_to(message, "Error analyzing image.")
+    # NOTE: Groq ka Free version abhi Image Analysis support nahi karta.
+    # Isliye hum user ko bata denge.
+    bot.reply_to(message, "⚠️ Maafi chahti hu, abhi main photos dekhkar dawai nahi bata sakti. Kripya dawai ka naam ya bimari likhkar bhejein.")
 
 @bot.message_handler(func=lambda m: True)
 def handle_text(message):
     bot.send_chat_action(message.chat.id, 'typing')
     reply = get_medical_advice(message.text)
+    # Markdown formatting safety
     try:
         bot.reply_to(message, reply, parse_mode="Markdown")
     except:
         bot.reply_to(message, reply)
 
-# ================= 6. SERVER =================
+# ================= 4. SERVER =================
 app = Flask(__name__)
 @app.route('/')
-def home(): return "Dr. Sneha Alive"
+def home(): return "Dr. Sneha (Groq Edition) is Live"
 
 def run_web():
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))

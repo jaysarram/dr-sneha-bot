@@ -13,9 +13,9 @@ from PIL import Image
 
 # Render Keys (Safe Cleaning)
 raw_token = os.environ.get("BOT_TOKEN", "")
-BOT_TOKEN = raw_token.strip().replace("'", "").replace('"', "")
+BOT_TOKEN = raw_token.strip().replace("'", "8514223652:AAH-1qD3aU0PKgLtMmJatXxqZWwz5YQtjyY").replace('"', "")
 
-raw_gemini = os.environ.get("GEMINI_API_KEY", "")
+raw_gemini = os.environ.get("GEMINI_API_KEY", "AIzaSyAlkLe-A78iY_wAWo-cA7H7f7PloGCC5gI")
 GEMINI_API_KEY = raw_gemini.strip().replace("'", "").replace('"', "")
 
 # QR Code Image Name (GitHub par yahi naam hona chahiye)
@@ -200,3 +200,4 @@ if __name__ == "__main__":
     threading.Thread(target=run_web, daemon=True).start()
     print("Bot Started...")
     bot.infinity_polling()
+

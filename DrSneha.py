@@ -15,7 +15,7 @@ raw_token = os.environ.get("BOT_TOKEN", "8514223652:AAH-1qD3aU0PKgLtMmJatXxqZWwz
 BOT_TOKEN = raw_token.strip().replace("'", "").replace('"', "")
 
 # Groq API Key
-raw_groq = os.environ.get("GROQ_API_KEY", "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")
+raw_groq = os.environ.get("GROQ_API_KEY", "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")
 GROQ_API_KEY = raw_groq.strip().replace("'", "").replace('"', "")
 
 QR_IMAGE_PATH = "business_qr.jpg" 
@@ -140,5 +140,6 @@ def run_web():
 if __name__ == "__main__":
     threading.Thread(target=run_web, daemon=True).start()
     bot.infinity_polling()
+
 
 

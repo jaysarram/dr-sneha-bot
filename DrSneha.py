@@ -6,15 +6,15 @@ import io
 from flask import Flask
 import telebot
 from telebot import types
-from groq import Groq  # <-- Google ki jagah Groq aa gaya
+from groq import Groq  # <-- Hum Groq use kar rahe hain
 from PIL import Image
 
 # ================= 1. CONFIGURATION =================
 # Telegram Token
-raw_token = os.environ.get("BOT_TOKEN", "8514223652:AAH-1qD3aU0PKgLtMmJatXxqZWwz5YQtjyY")
+raw_token = os.environ.get("BOT_TOKEN", "g8514223652:AAH-1qD3aU0PKgLtMmJatXxqZWwz5YQtjyY")
 BOT_TOKEN = raw_token.strip().replace("'", "").replace('"', "")
 
-# Groq API Key
+# Groq API Key (Yahan dhyan dein: Ye 'GROQ_API_KEY' hi dhundega)
 raw_groq = os.environ.get("GROQ_API_KEY", "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")
 GROQ_API_KEY = raw_groq.strip().replace("'", "").replace('"', "")
 
@@ -30,32 +30,35 @@ if GROQ_API_KEY:
         print("Success: Connected to Groq AI")
     except Exception as e:
         print(f"Groq Connection Error: {e}")
+else:
+    print("Error: GROQ_API_KEY not found in environment variables.")
 
-# ================= 2. MEDICAL LOGIC (Llama 3 via Groq) =================
+# ================= 2. MEDICAL LOGIC (Groq Llama 3.3) =================
 def get_medical_advice(user_query):
     if not ai_client:
-        return "⚠️ Technical Error: AI Brain (Groq) not connected."
+        return "⚠️ Technical Error: Groq API Key missing or invalid."
 
     doctor_prompt = """
     Act as Dr. Sneha, an expert AI Medical Consultant.
     Language: Hinglish (Hindi + English mix).
     
     Structure response in 3 parts:
-    1. 🚑 **Turant Upay (Immediate Relief):** Home remedies or first aid.
-    2. 💊 **Dawa (Medicine):** Suggest generic medicines, dosage & duration.
-    3. 🚫 **Parhez (Precautions):** Diet and things to avoid.
+    1. 🚑 **Turant Upay (Immediate Relief):**
+    2. 💊 **Dawa (Medicine):** Suggest generic medicines.
+    3. 🚫 **Parhez (Precautions):**
     
     Disclaimer: End with 'Note: I am an AI. Serious conditions me Doctor ko dikhayen.'
     """
     
     try:
-        # Groq Llama-3.3 Model Call
+        # ✅ NEW WORKING MODEL (Llama 3.3)
         chat_completion = ai_client.chat.completions.create(
             messages=[
                 {"role": "system", "content": doctor_prompt},
                 {"role": "user", "content": user_query}
             ],
-            model="llama-3.3-70b-versatile", # Super Fast & Smart Model
+            model="llama-3.3-70b-versatile", 
+            temperature=0.7
         )
         return chat_completion.choices[0].message.content
     except Exception as e:
@@ -80,7 +83,7 @@ def send_welcome(message):
     markup.add(*buttons)
     
     bot.send_message(message.chat.id, 
-                     "🙏 **Namaste! Main Dr. Sneha hu.**\n(Powered by Groq AI ⚡)\n\nApna plan chunein 👇", 
+                     "🙏 **Namaste! Main Dr. Sneha hu.**\n(AI Status: Active ✅)\n\nApna plan chunein 👇", 
                      parse_mode="Markdown", reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("buy_"))
@@ -107,7 +110,6 @@ def handle_photos(message):
     uid = message.chat.id
     udata = users_db.get(uid, {})
 
-    # Payment Verification
     if udata.get("status") == "pending_payment":
         plan_id = udata["plan_attempt"]
         expiry = datetime.datetime.now() + datetime.timedelta(days=PLANS[plan_id]['days'])
@@ -115,15 +117,13 @@ def handle_photos(message):
         bot.reply_to(message, f"✅ **Verified!** Plan Active until {expiry.strftime('%d-%m-%Y')}.\nAb bimari batayein.")
         return
 
-    # NOTE: Groq ka Free version abhi Image Analysis support nahi karta.
-    # Isliye hum user ko bata denge.
-    bot.reply_to(message, "⚠️ Maafi chahti hu, abhi main photos dekhkar dawai nahi bata sakti. Kripya dawai ka naam ya bimari likhkar bhejein.")
+    # Groq Free Photo Analysis Support nahi karta
+    bot.reply_to(message, "⚠️ Maafi chahti hu, main abhi photo dekhkar dawai nahi bata sakti. Kripya dawai ka naam ya bimari likhkar bhejein.")
 
 @bot.message_handler(func=lambda m: True)
 def handle_text(message):
     bot.send_chat_action(message.chat.id, 'typing')
     reply = get_medical_advice(message.text)
-    # Markdown formatting safety
     try:
         bot.reply_to(message, reply, parse_mode="Markdown")
     except:
@@ -132,7 +132,7 @@ def handle_text(message):
 # ================= 4. SERVER =================
 app = Flask(__name__)
 @app.route('/')
-def home(): return "Dr. Sneha (Groq Edition) is Live"
+def home(): return "Dr. Sneha (Groq Llama 3.3) is Live"
 
 def run_web():
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
@@ -140,6 +140,3 @@ def run_web():
 if __name__ == "__main__":
     threading.Thread(target=run_web, daemon=True).start()
     bot.infinity_polling()
-
-
-

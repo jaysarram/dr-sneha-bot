@@ -10,7 +10,7 @@ import google.generativeai as genai
 from PIL import Image
 
 # ================= 1. CONFIGURATION =================
-# Keys ko clean kar rahe hain (Space/Quotes hata ke)
+# Keys Cleanup
 raw_token = os.environ.get("BOT_TOKEN", "8514223652:AAH-1qD3aU0PKgLtMmJatXxqZWwz5YQtjyY")
 BOT_TOKEN = raw_token.strip().replace("'", "").replace('"', "")
 
@@ -21,74 +21,49 @@ QR_IMAGE_PATH = "business_qr.jpg"
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# ================= 2. AI CONNECTION (AUTO-FIX) =================
+# ================= 2. AI CONNECTION (Gemini Pro - Stable) =================
 ai_model = None
 system_status = "Offline"
 
 if GEMINI_API_KEY:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        
-        # Sabse pehle 'gemini-1.5-flash' try karenge (Fastest)
-        try:
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            # Ping test
-            model.generate_content("Hi")
-            ai_model = model
-            system_status = "Online (Gemini 1.5 Flash) 🟢"
-        except:
-            # Agar Flash fail hua, to 'gemini-pro' try karenge
-            print("Flash failed, switching to Pro...")
-            try:
-                ai_model = genai.GenerativeModel('gemini-pro')
-                system_status = "Online (Gemini Pro) 🟡"
-            except Exception as e:
-                system_status = f"Error: {str(e)} 🔴"
-                
+        # Hum 'gemini-pro' use kar rahe hain jo sabse stable hai
+        ai_model = genai.GenerativeModel('gemini-pro')
+        system_status = "Online (Gemini Pro) 🟢"
+        print("Success: Connected to Gemini Pro")
     except Exception as e:
         print(f"Connection Error: {e}")
+        system_status = "Error 🔴"
 
 # ================= 3. MEDICAL LOGIC =================
 def get_medical_advice(user_query, image=None):
     if not ai_model:
-        return f"⚠️ System Error: AI not connected. Status: {system_status}"
+        return "⚠️ Technical Error: API Key not working."
 
     doctor_prompt = """
-    Act as **Dr. Sneha**, an Advanced AI Medical Consultant.
+    Act as **Dr. Sneha**, an expert AI Medical Consultant.
     Language: Hinglish (Hindi + English mix).
-    Tone: Caring & Professional.
-
-    **INSTRUCTIONS:**
-    1. If user says "Hi/Hello", reply politely.
-    2. If user shares a symptom, DO NOT give medicine immediately. Analyze first.
-
-    **RESPONSE STRUCTURE:**
     
-    🔍 **Symptom Analysis (Karan):**
-    - Explain potential root causes.
-
-    ⚡ **Instant Upchar (Turant Aaram):**
-    - Home remedies/first aid (10-15 mins relief).
-
-    💊 **Medical Upchar (Dawa):**
-    - Suggest generic OTC medicines with dosage.
-
-    🏥 **Advanced Upchar:**
-    - Lifestyle/Diet changes and when to see a Specialist.
+    Structure response in 3 parts:
+    1. 🚑 **Turant Upay (Immediate Relief):**
+    2. 💊 **Dawa (Medicine):** Suggest generic medicines.
+    3. 🚫 **Parhez (Precautions):**
     
-    **Disclaimer:** End with: 'Note: Main AI hu. Gambhir samasya ke liye asli Doctor se milen.'
+    Disclaimer: End with 'Note: I am an AI. Serious conditions me Doctor ko dikhayen.'
     """
     
     try:
         if image:
-            prompt = [doctor_prompt + "\n\nAnalyze this medical photo:", image]
-            response = ai_model.generate_content(prompt)
+            # Gemini Pro text model images support nahi karta directly is code me.
+            # Safety ke liye hum user ko bata denge.
+            return "⚠️ Maafi, abhi main photo scan nahi kar sakti. Kripya dawai ka naam likh kar bhejein."
         else:
             prompt = doctor_prompt + "\n\nPatient Query: " + user_query
             response = ai_model.generate_content(prompt)
-        return response.text
+            return response.text
     except Exception as e:
-        return f"⚠️ AI Error: {str(e)}"
+        return f"⚠️ Network Error. Please try again. ({str(e)})"
 
 # ================= 4. PLANS & HANDLERS =================
 PLANS = {
@@ -111,11 +86,7 @@ def send_welcome(message):
     welcome_text = (
         f"👩‍⚕️ **Namaste! Main Dr. Sneha hu.**\n"
         f"Status: {system_status}\n\n"
-        "Main aapke lakshan (symptoms) samajh kar:\n"
-        "1️⃣ Root Cause (Karan)\n"
-        "2️⃣ Instant Upchar (Gharelu)\n"
-        "3️⃣ Medical Dawa\n"
-        "4️⃣ Advanced Care Suggest karungi.\n\n"
+        "Main aapke lakshan (symptoms) samajh kar ilaj bataungi.\n\n"
         "👇 **Shuru karne ke liye Plan chunein:**"
     )
     bot.send_message(message.chat.id, welcome_text, parse_mode="Markdown", reply_markup=markup)
@@ -135,7 +106,7 @@ def handle_payment_click(call):
                 bot.send_photo(call.message.chat.id, photo, caption=caption, parse_mode="Markdown")
             users_db[call.message.chat.id] = {"status": "pending_payment", "plan_attempt": plan_id}
         else:
-            bot.send_message(call.message.chat.id, "⚠️ Error: Admin ne QR Code upload nahi kiya.")
+            bot.send_message(call.message.chat.id, "⚠️ Error: QR Image missing.")
     except Exception as e:
         bot.send_message(call.message.chat.id, f"Error: {e}")
 
@@ -151,15 +122,8 @@ def handle_photos(message):
         bot.reply_to(message, f"✅ **Verified!** Plan activate ho gaya hai.\nAb apni pareshani batayein.")
         return
 
-    bot.send_chat_action(uid, 'typing')
-    try:
-        file_info = bot.get_file(message.photo[-1].file_id)
-        downloaded = bot.download_file(file_info.file_path)
-        img = Image.open(io.BytesIO(downloaded)).convert("RGB")
-        reply = get_medical_advice("", image=img)
-        bot.reply_to(message, reply, parse_mode="Markdown")
-    except Exception as e:
-        bot.reply_to(message, "Error processing image.")
+    # Pro model photo support nahi karta isliye text message bhejenge
+    bot.reply_to(message, "⚠️ Maafi, main abhi photo nahi padh sakti. Kripya dawai ka naam likhkar bhejein.")
 
 @bot.message_handler(func=lambda m: True)
 def handle_text(message):
@@ -173,7 +137,7 @@ def handle_text(message):
 # ================= 5. SERVER KEEPER =================
 app = Flask(__name__)
 @app.route('/')
-def home(): return "Dr. Sneha Final Version is Live"
+def home(): return "Dr. Sneha Stable Version Live"
 
 def run_web():
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))

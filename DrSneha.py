@@ -10,7 +10,6 @@ import google.generativeai as genai
 from PIL import Image
 
 # ================= 1. CONFIGURATION =================
-# Token & Keys
 raw_token = os.environ.get("BOT_TOKEN", "8514223652:AAH-1qD3aU0PKgLtMmJatXxqZWwz5YQtjyY")
 BOT_TOKEN = raw_token.strip().replace("'", "").replace('"', "")
 
@@ -21,63 +20,84 @@ QR_IMAGE_PATH = "business_qr.jpg"
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# ================= 2. ADVANCED AI BRAIN =================
+# ================= 2. INTELLIGENT MODEL SELECTOR =================
 ai_model = None
 system_status = "Offline"
+model_name_used = "Unknown"
 
 if GEMINI_API_KEY:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        # 1.5-flash model use kar rahe hain (Fast & Smart)
-        ai_model = genai.GenerativeModel('gemini-1.5-flash')
-        system_status = "Online (Advanced Mode) 🟢"
+        
+        # --- AUTO-FIX LOGIC ---
+        # Pehle naye model '1.5-flash' ko try karega.
+        # Agar wo fail hua (404 Error), to purane 'gemini-pro' par shift ho jayega.
+        try:
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            # Test ping
+            model.generate_content("Hi")
+            ai_model = model
+            model_name_used = "Gemini 1.5 Flash (Fast)"
+        except Exception as e:
+            print(f"Flash model failed ({e}), switching to Gemini Pro...")
+            ai_model = genai.GenerativeModel('gemini-pro')
+            model_name_used = "Gemini Pro (Stable)"
+
+        system_status = f"Online ({model_name_used}) 🟢"
+        
     except Exception as e:
         print(f"Connection Error: {e}")
         system_status = "Error 🔴"
 
-# ================= 3. MEDICAL LOGIC (THE UPGRADE) =================
+# ================= 3. ADVANCED MEDICAL BRAIN =================
 def get_medical_advice(user_query, image=None):
     if not ai_model:
         return "⚠️ Technical Error: AI Brain not active. Check API Key."
 
+    # --- ADVANCED DOCTOR PROMPT ---
     doctor_prompt = """
     Act as **Dr. Sneha**, a Senior Advanced AI Medical Consultant.
     Language: Hinglish (Hindi + English mix).
     Tone: Caring, Professional, and Investigative.
 
     **INSTRUCTIONS:**
-    1. If the user says "Hi", "Hello", or generic talk -> Reply politely.
-    2. If the user shares a symptom, DO NOT give medicine immediately. First analyze.
+    1. If user says "Hi/Hello", reply politely.
+    2. If user shares a symptom, DO NOT give medicine immediately. Analyze first.
 
-    **STRICT RESPONSE STRUCTURE:**
+    **RESPONSE STRUCTURE:**
     
-    🔍 **Symptom Analysis (Kyun ho raha hai?):**
-    - Analyze symptoms. Explain potential root causes.
+    🔍 **Symptom Analysis (Karan):**
+    - Explain potential root causes (Gas, Stress, Infection, etc.).
 
     ⚡ **Instant Upchar (Turant Aaram):**
-    - Suggest home remedies/first aid (10-15 mins relief).
+    - Home remedies/first aid for immediate relief.
 
     💊 **Medical Upchar (Dawa):**
-    - Suggest generic OTC medicines & dosage.
+    - Suggest generic OTC medicines with dosage.
 
-    🏥 **Advanced Upchar & Care:**
-    - Lifestyle changes, diet, and when to see a Specialist.
+    🏥 **Advanced Upchar:**
+    - Diet changes and when to see a Specialist.
     
     **Disclaimer:** End with: 'Note: Main AI hu. Gambhir samasya ke liye asli Doctor se milen.'
     """
     
     try:
         if image:
-            prompt = [doctor_prompt + "\n\nUser ne ye medical photo/dawa bheji hai. Iska deep analysis karo:", image]
-            response = ai_model.generate_content(prompt)
+            # Image logic based on model capability
+            if "Flash" in model_name_used:
+                prompt = [doctor_prompt + "\n\nAnalyze this medical photo:", image]
+                response = ai_model.generate_content(prompt)
+                return response.text
+            else:
+                return "⚠️ Maafi, purane model par photo scan available nahi hai. Kripya dawai ka naam likh kar bhejein."
         else:
             prompt = doctor_prompt + "\n\nPatient Query: " + user_query
             response = ai_model.generate_content(prompt)
-        return response.text
+            return response.text
     except Exception as e:
         return f"⚠️ AI Error: {str(e)}"
 
-# ================= 4. PLANS & PAYMENT =================
+# ================= 4. PLANS & HANDLERS =================
 PLANS = {
     "49":  {"price": 49,  "days": 1,  "name": "Quick Consult"}, 
     "149": {"price": 149, "days": 15, "name": "15 Days Care"},
@@ -98,7 +118,7 @@ def send_welcome(message):
     welcome_text = (
         f"👩‍⚕️ **Namaste! Main Dr. Sneha hu.**\n"
         f"Status: {system_status}\n\n"
-        "Main bimari ke **lakshan (symptoms)** samajh kar:\n"
+        "Main aapke lakshan (symptoms) samajh kar:\n"
         "1️⃣ Root Cause (Karan)\n"
         "2️⃣ Instant Upchar (Gharelu)\n"
         "3️⃣ Medical Dawa\n"
@@ -168,4 +188,3 @@ def run_web():
 if __name__ == "__main__":
     threading.Thread(target=run_web, daemon=True).start()
     bot.infinity_polling()
-

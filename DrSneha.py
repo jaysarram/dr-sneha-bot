@@ -10,8 +10,8 @@ import google.generativeai as genai
 from PIL import Image
 
 # ================= 1. CONFIGURATION =================
-# Token & Keys (Space aur Quotes hata kar load karega)
-raw_token = os.environ.get("BOT_TOKEN", "8514223652:AAH-1qD3aU0PKgLtMmJatXxqZWwz5YQtjyY")
+# Token & Keys
+raw_token = os.environ.get("BOT_TOKEN", "g8514223652:AAH-1qD3aU0PKgLtMmJatXxqZWwz5YQtjyY")
 BOT_TOKEN = raw_token.strip().replace("'", "").replace('"', "")
 
 raw_gemini = os.environ.get("GEMINI_API_KEY", "AIzaSyAoisT6LlO7kmgA8aQ93ke9Jjfm2SErvAc")
@@ -28,7 +28,7 @@ system_status = "Offline"
 if GEMINI_API_KEY:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        # Hum '1.5-flash' use karenge (Fast & Smart)
+        # 1.5-flash model use kar rahe hain (Fast & Smart)
         ai_model = genai.GenerativeModel('gemini-1.5-flash')
         system_status = "Online (Advanced Mode) 🟢"
     except Exception as e:
@@ -40,44 +40,37 @@ def get_medical_advice(user_query, image=None):
     if not ai_model:
         return "⚠️ Technical Error: AI Brain not active. Check API Key."
 
-    # --- YAHAN HAI ASLI JAADU (New Prompt) ---
     doctor_prompt = """
     Act as **Dr. Sneha**, a Senior Advanced AI Medical Consultant.
     Language: Hinglish (Hindi + English mix).
     Tone: Caring, Professional, and Investigative.
 
     **INSTRUCTIONS:**
-    1. If the user says "Hi", "Hello", or generic talk -> Reply politely and ask about their health.
-    2. If the user shares a symptom (e.g., "Pet dard"), DO NOT give medicine immediately. First analyze.
+    1. If the user says "Hi", "Hello", or generic talk -> Reply politely.
+    2. If the user shares a symptom, DO NOT give medicine immediately. First analyze.
 
-    **STRICT RESPONSE STRUCTURE (For Medical Queries):**
+    **STRICT RESPONSE STRUCTURE:**
     
-    🔍 **Symptom Analysis & Cause (Kyun ho raha hai?):**
-    - Analyze the symptoms provided.
-    - Explain 1-2 potential root causes (Gas, Infection, Stress, etc.).
-    - If the user gave very less info, ask follow-up questions here.
+    🔍 **Symptom Analysis (Kyun ho raha hai?):**
+    - Analyze symptoms. Explain potential root causes.
 
     ⚡ **Instant Upchar (Turant Aaram):**
-    - Suggest home remedies or first aid that gives relief in 10-15 mins.
+    - Suggest home remedies/first aid (10-15 mins relief).
 
     💊 **Medical Upchar (Dawa):**
-    - Suggest standard OTC (Over-the-Counter) medicines.
-    - Mention dosage (e.g., Subah-Shaam khane ke baad).
+    - Suggest generic OTC medicines & dosage.
 
     🏥 **Advanced Upchar & Care:**
-    - Suggest lifestyle changes, diet (kya khayein/kya nahi).
-    - Advise when to see a real Specialist Doctor.
+    - Lifestyle changes, diet, and when to see a Specialist.
     
     **Disclaimer:** End with: 'Note: Main AI hu. Gambhir samasya ke liye asli Doctor se milen.'
     """
     
     try:
         if image:
-            # Photo Analysis Logic
             prompt = [doctor_prompt + "\n\nUser ne ye medical photo/dawa bheji hai. Iska deep analysis karo:", image]
             response = ai_model.generate_content(prompt)
         else:
-            # Text Analysis Logic
             prompt = doctor_prompt + "\n\nPatient Query: " + user_query
             response = ai_model.generate_content(prompt)
         return response.text
@@ -106,7 +99,7 @@ def send_welcome(message):
         f"👩‍⚕️ **Namaste! Main Dr. Sneha hu.**\n"
         f"Status: {system_status}\n\n"
         "Main bimari ke **lakshan (symptoms)** samajh kar:\n"
-        "1️⃣ Root Cause (Karan) bataungi\n"
+        "1️⃣ Root Cause (Karan)\n"
         "2️⃣ Instant Upchar (Gharelu)\n"
         "3️⃣ Medical Dawa\n"
         "4️⃣ Advanced Care Suggest karungi.\n\n"
@@ -138,21 +131,18 @@ def handle_photos(message):
     uid = message.chat.id
     udata = users_db.get(uid, {})
 
-    # Payment Verification
     if udata.get("status") == "pending_payment":
         plan_id = udata["plan_attempt"]
         expiry = datetime.datetime.now() + datetime.timedelta(days=PLANS[plan_id]['days'])
         users_db[uid] = {"status": "active", "plan_id": plan_id, "expiry": expiry}
-        bot.reply_to(message, f"✅ **Verified!** Aapka Advanced Plan activate ho gaya hai.\nAb apni pareshani batayein.")
+        bot.reply_to(message, f"✅ **Verified!** Plan activate ho gaya hai.\nAb apni pareshani batayein.")
         return
 
-    # Medical Photo Analysis
     bot.send_chat_action(uid, 'typing')
     try:
         file_info = bot.get_file(message.photo[-1].file_id)
         downloaded = bot.download_file(file_info.file_path)
         img = Image.open(io.BytesIO(downloaded)).convert("RGB")
-        
         reply = get_medical_advice("", image=img)
         bot.reply_to(message, reply, parse_mode="Markdown")
     except Exception as e:

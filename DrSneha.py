@@ -10,6 +10,7 @@ import google.generativeai as genai
 from PIL import Image
 
 # ================= 1. CONFIGURATION =================
+# Keys ko clean kar rahe hain (Space/Quotes hata ke)
 raw_token = os.environ.get("BOT_TOKEN", "8514223652:AAH-1qD3aU0PKgLtMmJatXxqZWwz5YQtjyY")
 BOT_TOKEN = raw_token.strip().replace("'", "").replace('"', "")
 
@@ -20,45 +21,42 @@ QR_IMAGE_PATH = "business_qr.jpg"
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# ================= 2. INTELLIGENT MODEL SELECTOR =================
+# ================= 2. AI CONNECTION (AUTO-FIX) =================
 ai_model = None
 system_status = "Offline"
-model_name_used = "Unknown"
 
 if GEMINI_API_KEY:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
         
-        # --- AUTO-FIX LOGIC ---
-        # Pehle naye model '1.5-flash' ko try karega.
-        # Agar wo fail hua (404 Error), to purane 'gemini-pro' par shift ho jayega.
+        # Sabse pehle 'gemini-1.5-flash' try karenge (Fastest)
         try:
             model = genai.GenerativeModel('gemini-1.5-flash')
-            # Test ping
+            # Ping test
             model.generate_content("Hi")
             ai_model = model
-            model_name_used = "Gemini 1.5 Flash (Fast)"
-        except Exception as e:
-            print(f"Flash model failed ({e}), switching to Gemini Pro...")
-            ai_model = genai.GenerativeModel('gemini-pro')
-            model_name_used = "Gemini Pro (Stable)"
-
-        system_status = f"Online ({model_name_used}) 🟢"
-        
+            system_status = "Online (Gemini 1.5 Flash) 🟢"
+        except:
+            # Agar Flash fail hua, to 'gemini-pro' try karenge
+            print("Flash failed, switching to Pro...")
+            try:
+                ai_model = genai.GenerativeModel('gemini-pro')
+                system_status = "Online (Gemini Pro) 🟡"
+            except Exception as e:
+                system_status = f"Error: {str(e)} 🔴"
+                
     except Exception as e:
         print(f"Connection Error: {e}")
-        system_status = "Error 🔴"
 
-# ================= 3. ADVANCED MEDICAL BRAIN =================
+# ================= 3. MEDICAL LOGIC =================
 def get_medical_advice(user_query, image=None):
     if not ai_model:
-        return "⚠️ Technical Error: AI Brain not active. Check API Key."
+        return f"⚠️ System Error: AI not connected. Status: {system_status}"
 
-    # --- ADVANCED DOCTOR PROMPT ---
     doctor_prompt = """
-    Act as **Dr. Sneha**, a Senior Advanced AI Medical Consultant.
+    Act as **Dr. Sneha**, an Advanced AI Medical Consultant.
     Language: Hinglish (Hindi + English mix).
-    Tone: Caring, Professional, and Investigative.
+    Tone: Caring & Professional.
 
     **INSTRUCTIONS:**
     1. If user says "Hi/Hello", reply politely.
@@ -67,33 +65,28 @@ def get_medical_advice(user_query, image=None):
     **RESPONSE STRUCTURE:**
     
     🔍 **Symptom Analysis (Karan):**
-    - Explain potential root causes (Gas, Stress, Infection, etc.).
+    - Explain potential root causes.
 
     ⚡ **Instant Upchar (Turant Aaram):**
-    - Home remedies/first aid for immediate relief.
+    - Home remedies/first aid (10-15 mins relief).
 
     💊 **Medical Upchar (Dawa):**
     - Suggest generic OTC medicines with dosage.
 
     🏥 **Advanced Upchar:**
-    - Diet changes and when to see a Specialist.
+    - Lifestyle/Diet changes and when to see a Specialist.
     
     **Disclaimer:** End with: 'Note: Main AI hu. Gambhir samasya ke liye asli Doctor se milen.'
     """
     
     try:
         if image:
-            # Image logic based on model capability
-            if "Flash" in model_name_used:
-                prompt = [doctor_prompt + "\n\nAnalyze this medical photo:", image]
-                response = ai_model.generate_content(prompt)
-                return response.text
-            else:
-                return "⚠️ Maafi, purane model par photo scan available nahi hai. Kripya dawai ka naam likh kar bhejein."
+            prompt = [doctor_prompt + "\n\nAnalyze this medical photo:", image]
+            response = ai_model.generate_content(prompt)
         else:
             prompt = doctor_prompt + "\n\nPatient Query: " + user_query
             response = ai_model.generate_content(prompt)
-            return response.text
+        return response.text
     except Exception as e:
         return f"⚠️ AI Error: {str(e)}"
 
@@ -180,7 +173,7 @@ def handle_text(message):
 # ================= 5. SERVER KEEPER =================
 app = Flask(__name__)
 @app.route('/')
-def home(): return "Dr. Sneha Advanced AI is Live"
+def home(): return "Dr. Sneha Final Version is Live"
 
 def run_web():
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))

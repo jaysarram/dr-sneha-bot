@@ -3,69 +3,80 @@ import threading
 import time
 import datetime
 import io
+import requests  # <-- Hum ab direct Requests use karenge
 from flask import Flask
 import telebot
 from telebot import types
-import google.generativeai as genai
 from PIL import Image
+import base64
 
 # ================= 1. CONFIGURATION =================
-# Keys Cleanup
 raw_token = os.environ.get("BOT_TOKEN", "8514223652:AAH-1qD3aU0PKgLtMmJatXxqZWwz5YQtjyY")
 BOT_TOKEN = raw_token.strip().replace("'", "").replace('"', "")
 
-raw_gemini = os.environ.get("GEMINI_API_KEY", "AIzaSyAoisT6LlO7kmgA8aQ93ke9Jjfm2SErvAc")
+raw_gemini = os.environ.get("GEMINI_API_KEY", "8514223652:AAH-1qD3aU0PKgLtMmJatXxqZWwz5YQtjyY")
 GEMINI_API_KEY = raw_gemini.strip().replace("'", "").replace('"', "")
 
 QR_IMAGE_PATH = "business_qr.jpg" 
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# ================= 2. AI CONNECTION (Gemini Pro - Stable) =================
-ai_model = None
-system_status = "Offline"
+# ================= 2. DIRECT API CONNECTION (NO LIBRARY) =================
+def get_medical_advice(user_query, image_bytes=None):
+    if not GEMINI_API_KEY:
+        return "⚠️ Error: API Key missing."
 
-if GEMINI_API_KEY:
-    try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        # Hum 'gemini-pro' use kar rahe hain jo sabse stable hai
-        ai_model = genai.GenerativeModel('gemini-pro')
-        system_status = "Online (Gemini Pro) 🟢"
-        print("Success: Connected to Gemini Pro")
-    except Exception as e:
-        print(f"Connection Error: {e}")
-        system_status = "Error 🔴"
-
-# ================= 3. MEDICAL LOGIC =================
-def get_medical_advice(user_query, image=None):
-    if not ai_model:
-        return "⚠️ Technical Error: API Key not working."
-
+    # Hum seedha Google ke URL par request bhejenge (Library bypass)
+    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    
     doctor_prompt = """
-    Act as **Dr. Sneha**, an expert AI Medical Consultant.
+    Act as Dr. Sneha, an Advanced AI Medical Consultant.
     Language: Hinglish (Hindi + English mix).
     
-    Structure response in 3 parts:
+    Structure response:
     1. 🚑 **Turant Upay (Immediate Relief):**
-    2. 💊 **Dawa (Medicine):** Suggest generic medicines.
+    2. 💊 **Dawa (Medicine):** Suggest OTC medicines.
     3. 🚫 **Parhez (Precautions):**
     
-    Disclaimer: End with 'Note: I am an AI. Serious conditions me Doctor ko dikhayen.'
+    Note: End with 'Main AI hu. Asli Doctor se milen.'
     """
-    
-    try:
-        if image:
-            # Gemini Pro text model images support nahi karta directly is code me.
-            # Safety ke liye hum user ko bata denge.
-            return "⚠️ Maafi, abhi main photo scan nahi kar sakti. Kripya dawai ka naam likh kar bhejein."
-        else:
-            prompt = doctor_prompt + "\n\nPatient Query: " + user_query
-            response = ai_model.generate_content(prompt)
-            return response.text
-    except Exception as e:
-        return f"⚠️ Network Error. Please try again. ({str(e)})"
 
-# ================= 4. PLANS & HANDLERS =================
+    full_prompt = f"{doctor_prompt}\n\nUser Query: {user_query}"
+
+    # Payload (Message Packet) taiyar karna
+    payload = {
+        "contents": [{
+            "parts": [{"text": full_prompt}]
+        }]
+    }
+
+    # Agar Image hai, to use bhi packet me daalo
+    if image_bytes:
+        # Image ko text code (base64) me badalna padta hai direct bhejne ke liye
+        img_b64 = base64.b64encode(image_bytes).decode('utf-8')
+        payload["contents"][0]["parts"].append({
+            "inline_data": {
+                "mime_type": "image/jpeg",
+                "data": img_b64
+            }
+        })
+
+    try:
+        # Request bhejo
+        response = requests.post(api_url, json=payload)
+        
+        # Check karo ki Google ne kya jawab diya
+        if response.status_code == 200:
+            data = response.json()
+            # Jawab nikalo
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        else:
+            return f"⚠️ Google API Error: {response.text}"
+            
+    except Exception as e:
+        return f"⚠️ Network Error: {str(e)}"
+
+# ================= 3. PLANS & HANDLERS =================
 PLANS = {
     "49":  {"price": 49,  "days": 1,  "name": "Quick Consult"}, 
     "149": {"price": 149, "days": 15, "name": "15 Days Care"},
@@ -83,13 +94,9 @@ def send_welcome(message):
         buttons.append(types.InlineKeyboardButton(btn_text, callback_data=f"buy_{plan_id}"))
     markup.add(*buttons)
     
-    welcome_text = (
-        f"👩‍⚕️ **Namaste! Main Dr. Sneha hu.**\n"
-        f"Status: {system_status}\n\n"
-        "Main aapke lakshan (symptoms) samajh kar ilaj bataungi.\n\n"
-        "👇 **Shuru karne ke liye Plan chunein:**"
-    )
-    bot.send_message(message.chat.id, welcome_text, parse_mode="Markdown", reply_markup=markup)
+    bot.send_message(message.chat.id, 
+                     "🙏 **Namaste! Main Dr. Sneha hu.**\n(Direct API Mode ✅)\n\nApna plan chunein 👇", 
+                     parse_mode="Markdown", reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("buy_"))
 def handle_payment_click(call):
@@ -97,7 +104,7 @@ def handle_payment_click(call):
         plan_id = call.data.split("_")[1]
         plan = PLANS.get(plan_id)
         if not plan: return
-
+        
         bot.answer_callback_query(call.id, "Processing...")
         caption = f"🏥 **Plan:** {plan['name']}\n💰 **Amount:** ₹{plan['price']}\n👇 **QR Scan karein aur Screenshot bhejein**"
 
@@ -122,8 +129,16 @@ def handle_photos(message):
         bot.reply_to(message, f"✅ **Verified!** Plan activate ho gaya hai.\nAb apni pareshani batayein.")
         return
 
-    # Pro model photo support nahi karta isliye text message bhejenge
-    bot.reply_to(message, "⚠️ Maafi, main abhi photo nahi padh sakti. Kripya dawai ka naam likhkar bhejein.")
+    # Medical Photo Analysis (Direct Mode)
+    bot.send_chat_action(uid, 'typing')
+    try:
+        file_info = bot.get_file(message.photo[-1].file_id)
+        downloaded = bot.download_file(file_info.file_path)
+        # Seedha bytes bhejo function ko
+        reply = get_medical_advice("", image_bytes=downloaded)
+        bot.reply_to(message, reply, parse_mode="Markdown")
+    except Exception as e:
+        bot.reply_to(message, f"Error analyzing image: {e}")
 
 @bot.message_handler(func=lambda m: True)
 def handle_text(message):
@@ -134,10 +149,10 @@ def handle_text(message):
     except:
         bot.reply_to(message, reply)
 
-# ================= 5. SERVER KEEPER =================
+# ================= 4. SERVER =================
 app = Flask(__name__)
 @app.route('/')
-def home(): return "Dr. Sneha Stable Version Live"
+def home(): return "Dr. Sneha Direct Mode Live"
 
 def run_web():
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
